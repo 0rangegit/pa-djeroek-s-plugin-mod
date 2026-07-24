@@ -175,6 +175,12 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 10px 25px rgba(249, 115, 22, 0.35);
+      opacity: 1;
+      transition: opacity 0.24s ease;
+    }
+
+    .mini-toggle.mini-dim {
+      opacity: 0.28;
     }
 
     .window.dragging,
@@ -190,6 +196,14 @@
       border-radius: 50%;
       transform: scale(0.88);
       opacity: 0.96;
+      background: rgba(0, 0, 0, 0.9);
+    }
+
+    .window.closed.idle-muted {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+      opacity: 0.16;
     }
 
     .window.closed .titlebar {
@@ -275,6 +289,79 @@
       overflow: auto;
     }
 
+    .explorer-card {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .explorer-header {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .explorer-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .explorer-back {
+      border: 0;
+      border-radius: 8px;
+      padding: 6px 10px;
+      background: linear-gradient(180deg, #fb923c, #f97316);
+      color: #1f2937;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .explorer-path {
+      color: var(--muted);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .explorer-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+      max-height: 170px;
+      overflow: auto;
+    }
+
+    .explorer-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .explorer-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .explorer-icon {
+      width: 14px;
+      text-align: center;
+      opacity: 0.8;
+    }
+
     .hint {
       margin: 0;
       color: var(--muted);
@@ -311,6 +398,16 @@
         </div>
 
         <p class="scan-output" id="scanOutput">workspace scan results will appear here.</p>
+
+        <div class="explorer-card">
+          <div class="explorer-header">explorer</div>
+          <div class="explorer-nav">
+            <button class="explorer-back" id="explorerBack">exit</button>
+            <div class="explorer-path" id="explorerPath">/</div>
+          </div>
+          <ul class="explorer-list" id="explorerList"></ul>
+        </div>
+
         <p class="hint">drag the title bar to move this menu around.</p>
       </div>
     </div>
@@ -322,6 +419,9 @@
     const recordButton = document.getElementById('recordButton');
     const scanButton = document.getElementById('scanButton');
     const scanOutput = document.getElementById('scanOutput');
+    const explorerList = document.getElementById('explorerList');
+    const explorerBack = document.getElementById('explorerBack');
+    const explorerPath = document.getElementById('explorerPath');
     const resizeHandle = document.getElementById('resizeHandle');
     const resizeTopEdge = document.getElementById('resizeTopEdge');
     const resizeBottomEdge = document.getElementById('resizeBottomEdge');
@@ -346,15 +446,39 @@
     let mediaRecorder;
     let recordedChunks = [];
     let stream;
+    let miniIdleTimer = null;
+    let miniPointerActive = false;
 
-    titlebar.addEventListener('pointerdown', (event) => {
+    const revealMiniToggle = () => {
+      miniToggle.classList.remove('mini-dim');
+      windowEl.classList.remove('idle-muted');
+      window.clearTimeout(miniIdleTimer);
+      miniIdleTimer = null;
+    };
+
+    const scheduleMiniDim = () => {
+      revealMiniToggle();
+      if (!windowEl.classList.contains('closed')) return;
+
+      miniIdleTimer = window.setTimeout(() => {
+        miniToggle.classList.add('mini-dim');
+        windowEl.classList.add('idle-muted');
+      }, 1800);
+    };
+
+    const startWindowDrag = (event) => {
       isDragging = true;
       windowEl.classList.add('dragging');
-      titlebar.setPointerCapture(event.pointerId);
+      revealMiniToggle();
 
       const rect = windowEl.getBoundingClientRect();
       offsetX = event.clientX - rect.left;
       offsetY = event.clientY - rect.top;
+    };
+
+    titlebar.addEventListener('pointerdown', (event) => {
+      startWindowDrag(event);
+      titlebar.setPointerCapture(event.pointerId);
     });
 
     titlebar.addEventListener('pointermove', (event) => {
@@ -373,14 +497,18 @@
       windowEl.style.top = `${nextY}px`;
     });
 
-    titlebar.addEventListener('pointerup', () => {
+    const endWindowDrag = () => {
       isDragging = false;
       windowEl.classList.remove('dragging');
+      scheduleMiniDim();
+    };
+
+    titlebar.addEventListener('pointerup', () => {
+      endWindowDrag();
     });
 
     titlebar.addEventListener('pointerleave', () => {
-      isDragging = false;
-      windowEl.classList.remove('dragging');
+      endWindowDrag();
     });
 
     const setWindowOpen = (open) => {
@@ -389,6 +517,9 @@
         windowEl.style.width = `${savedWidth}px`;
         windowEl.style.height = `${savedHeight}px`;
         windowEl.style.borderRadius = '14px';
+        revealMiniToggle();
+        window.clearTimeout(miniIdleTimer);
+        miniIdleTimer = null;
       } else {
         savedWidth = windowEl.offsetWidth || savedWidth;
         savedHeight = windowEl.offsetHeight || savedHeight;
@@ -396,6 +527,7 @@
         windowEl.style.width = '68px';
         windowEl.style.height = '68px';
         windowEl.style.borderRadius = '50%';
+        scheduleMiniDim();
       }
     };
 
@@ -404,8 +536,46 @@
       setWindowOpen(false);
     });
 
+    miniToggle.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      miniPointerActive = true;
+      startWindowDrag(event);
+      miniToggle.setPointerCapture(event.pointerId);
+    });
+
+    miniToggle.addEventListener('pointermove', (event) => {
+      if (!isDragging || !miniPointerActive) return;
+
+      const maxX = window.innerWidth - windowEl.offsetWidth;
+      const maxY = window.innerHeight - windowEl.offsetHeight;
+
+      let nextX = event.clientX - offsetX;
+      let nextY = event.clientY - offsetY;
+
+      nextX = Math.max(0, Math.min(nextX, maxX));
+      nextY = Math.max(0, Math.min(nextY, maxY));
+
+      windowEl.style.left = `${nextX}px`;
+      windowEl.style.top = `${nextY}px`;
+    });
+
+    miniToggle.addEventListener('pointerup', () => {
+      miniPointerActive = false;
+      endWindowDrag();
+    });
+
+    miniToggle.addEventListener('pointerleave', () => {
+      if (!miniPointerActive) return;
+      miniPointerActive = false;
+      endWindowDrag();
+    });
+
     miniToggle.addEventListener('click', (event) => {
       event.stopPropagation();
+      if (miniPointerActive) {
+        miniPointerActive = false;
+        return;
+      }
       setWindowOpen(true);
     });
 
@@ -609,18 +779,93 @@
       
     });
 
+    const parseDirectoryItems = (html, basePath = '/') => {
+      const matches = [...html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)];
+      const items = matches
+        .map((match) => ({ href: match[1].trim(), name: match[2].trim() }))
+        .filter((item) => item.name && !item.name.startsWith('?') && !item.name.includes('Parent Directory'));
+
+      return items.map((item) => {
+        const normalizedHref = item.href.replace(/\\/g, '/');
+        const isDirectory = normalizedHref.endsWith('/') || normalizedHref === '../';
+
+        return {
+          ...item,
+          normalizedHref,
+          isDirectory,
+          displayName: item.name.replace(/\/$/, '')
+        };
+      });
+    };
+
+    const getParentPath = (path) => {
+      if (path === '/' || path === '') return '/';
+
+      const trimmed = path.replace(/\/$/, '');
+      const lastSlash = trimmed.lastIndexOf('/');
+
+      if (lastSlash <= 0) return '/';
+      return `${trimmed.slice(0, lastSlash)}/`;
+    };
+
+    const renderExplorer = async (path = '/') => {
+      try {
+        const response = await fetch(path);
+        const html = await response.text();
+        const items = parseDirectoryItems(html, path).slice(0, 20);
+
+        explorerList.innerHTML = '';
+        explorerPath.textContent = path === '/' ? '/' : path;
+        explorerBack.disabled = path === '/';
+        explorerBack.style.opacity = path === '/' ? '0.45' : '1';
+
+        if (items.length === 0) {
+          const emptyItem = document.createElement('li');
+          emptyItem.className = 'explorer-item';
+          emptyItem.textContent = 'no items found';
+          explorerList.appendChild(emptyItem);
+          return;
+        }
+
+        items.forEach((item) => {
+          const listItem = document.createElement('li');
+          listItem.className = 'explorer-item';
+          listItem.innerHTML = `<span class="explorer-icon">${item.isDirectory ? '📁' : '📄'}</span><span>${item.displayName}</span>`;
+
+          listItem.addEventListener('click', async () => {
+            if (!item.isDirectory) return;
+
+            const nextPath = item.normalizedHref.startsWith('/')
+              ? item.normalizedHref
+              : `${path === '/' ? '' : path}${item.normalizedHref}`;
+
+            await renderExplorer(nextPath);
+          });
+
+          explorerList.appendChild(listItem);
+        });
+      } catch (error) {
+        explorerList.innerHTML = '';
+        const fallbackItem = document.createElement('li');
+        fallbackItem.className = 'explorer-item';
+        fallbackItem.textContent = 'explorer unavailable';
+        explorerList.appendChild(fallbackItem);
+      }
+    };
+
+    explorerBack.addEventListener('click', async () => {
+      const nextPath = getParentPath(explorerPath.textContent || '/');
+      await renderExplorer(nextPath);
+    });
+
     scanButton.addEventListener('click', async () => {
       scanOutput.textContent = 'Checking workspace…';
 
       try {
         const response = await fetch('/');
         const html = await response.text();
-        const matches = [...html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)];
-        const items = matches
-          .map((match) => match[2].trim())
-          .filter((name) => name && !name.startsWith('?') && !name.includes('Parent Directory'));
-
-        const uniqueItems = [...new Set(items)].slice(0, 12);
+        const items = parseDirectoryItems(html).slice(0, 12);
+        const uniqueItems = [...new Set(items.map((item) => item.displayName))];
 
         if (uniqueItems.length === 0) {
           scanOutput.textContent = 'No workspace items were found in the current directory list.';
@@ -628,10 +873,13 @@
         }
 
         scanOutput.textContent = uniqueItems.join(' • ');
+        await renderExplorer('/');
       } catch (error) {
         scanOutput.textContent = 'Workspace scan failed. The preview server may not be exposing the directory listing.';
       }
     });
+
+    renderExplorer('/');
 
     recordButton.addEventListener('click', async () => {
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
