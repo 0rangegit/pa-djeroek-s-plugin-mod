@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>draggable ui menu</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;700&display=swap');
+
+    :root {
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #38bdf8;
+      --accent-2: #0ea5e9;
+      --panel: rgba(0, 0, 0, 0.22);
+      --panel-strong: rgba(0, 0, 0, 0.58);
+      --border: rgba(255, 255, 255, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Source Code Pro', monospace;
+      text-transform: lowercase;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .demo-area {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .window {
+      position: absolute;
+      top: 80px;
+      left: 80px;
+      width: 360px;
+      min-width: 220px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.9);
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      transform-origin: top left;
+      transition:
+        width 0.28s ease,
+        height 0.28s ease,
+        left 0.28s ease,
+        top 0.28s ease,
+        border-radius 0.28s ease,
+        transform 0.28s ease,
+        opacity 0.28s ease;
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .resize-handle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 10px;
+      height: 100%;
+      cursor: ew-resize;
+      z-index: 2;
+    }
+
+    .resize-edge {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 10px;
+      cursor: ns-resize;
+      z-index: 2;
+    }
+
+    .resize-edge.top {
+      top: 0;
+    }
+
+    .resize-edge.bottom {
+      bottom: 0;
+    }
+
+    .resize-corner {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      z-index: 3;
+      background: linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, 0.65) 45%, rgba(255, 255, 255, 0.65) 55%, transparent 55%);
+    }
+
+    .resize-corner.right-bottom {
+      right: 0;
+      bottom: 0;
+      cursor: nwse-resize;
+      border-radius: 0 0 12px 0;
+    }
+
+    .resize-corner.left-bottom {
+      left: 0;
+      bottom: 0;
+      cursor: nesw-resize;
+      border-radius: 0 0 0 12px;
+      transform: scaleX(-1);
+    }
+
+    .resize-corner.left-top {
+      left: 0;
+      top: 0;
+      cursor: nesw-resize;
+      border-radius: 12px 0 0 0;
+      transform: scaleY(-1);
+    }
+
+    .titlebar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: var(--panel-strong);
+      cursor: grab;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .titlebar:active {
+      cursor: grabbing;
+    }
+
+    .titlebar h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .close-btn,
+    .mini-toggle {
+      border: 0;
+      font-family: inherit;
+      font-weight: 700;
+    }
+
+    .close-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ef4444;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+    }
+
+    .mini-toggle {
+      display: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #fb923c, #f97316);
+      color: #1f2937;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.35);
+    }
+
+    .window.dragging,
+    .window.resizing {
+      transition: none;
+    }
+
+    .window.closed {
+      width: 68px !important;
+      height: 68px !important;
+      min-width: 68px !important;
+      min-height: 68px !important;
+      border-radius: 50%;
+      transform: scale(0.88);
+      opacity: 0.96;
+    }
+
+    .window.closed .titlebar {
+      justify-content: center;
+      padding: 0;
+      background: rgba(0, 0, 0, 0.9);
+      border-bottom: none;
+      height: 100%;
+    }
+
+    .window.closed .titlebar h1,
+    .window.closed .resize-handle,
+    .window.closed .resize-corner,
+    .window.closed .controls {
+      display: none;
+    }
+
+    .window.closed .content {
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      max-height: 0;
+      padding: 0 16px;
+    }
+
+    .window.closed .mini-toggle {
+      display: flex;
+    }
+
+    .content {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      background: transparent;
+      transition: opacity 0.22s ease, transform 0.22s ease, max-height 0.22s ease, padding 0.22s ease;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .label {
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .scan-btn,
+    .record-btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: linear-gradient(180deg, #fb923c, #f97316);
+      color: #1f2937;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.35);
+    }
+
+    .record-btn.recording {
+      background: linear-gradient(180deg, #ef4444, #dc2626);
+      color: white;
+    }
+
+    .scan-output {
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      max-height: 170px;
+      overflow: auto;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-area">
+    <div class="window" id="draggableWindow">
+      <div class="resize-handle" id="resizeHandle"></div>
+      <div class="resize-edge top" id="resizeTopEdge"></div>
+      <div class="resize-edge bottom" id="resizeBottomEdge"></div>
+      <div class="resize-corner right-bottom" id="resizeCorner"></div>
+      <div class="resize-corner left-bottom" id="resizeCornerBottomLeft"></div>
+      <div class="resize-corner left-top" id="resizeCornerTopLeft"></div>
+      <div class="titlebar" id="titlebar">
+        <h1>pa djeroek's plugin!</h1>
+        <div class="controls">
+          <button class="close-btn" id="closeButton" aria-label="close menu">✕</button>
+        </div>
+        <button class="mini-toggle" id="miniToggle" aria-label="open menu">pj</button>
+      </div>
+
+      <div class="content">
+        <div class="row">
+          <span class="label">record video</span>
+          <button class="record-btn" id="recordButton">start</button>
+        </div>
+
+        <div class="row">
+          <span class="label">scan workspace</span>
+          <button class="scan-btn" id="scanButton">check</button>
+        </div>
+
+        <p class="scan-output" id="scanOutput">workspace scan results will appear here.</p>
+        <p class="hint">drag the title bar to move this menu around.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const windowEl = document.getElementById('draggableWindow');
+    const titlebar = document.getElementById('titlebar');
+    const recordButton = document.getElementById('recordButton');
+    const scanButton = document.getElementById('scanButton');
+    const scanOutput = document.getElementById('scanOutput');
+    const resizeHandle = document.getElementById('resizeHandle');
+    const resizeTopEdge = document.getElementById('resizeTopEdge');
+    const resizeBottomEdge = document.getElementById('resizeBottomEdge');
+    const resizeCorner = document.getElementById('resizeCorner');
+    const resizeCornerBottomLeft = document.getElementById('resizeCornerBottomLeft');
+    const resizeCornerTopLeft = document.getElementById('resizeCornerTopLeft');
+    const closeButton = document.getElementById('closeButton');
+    const miniToggle = document.getElementById('miniToggle');
+
+    let isDragging = false;
+    let isResizing = false;
+    let offsetX = 0;
+    let offsetY = 0;
+    let startWidth = 360;
+    let startHeight = 240;
+    let startLeft = 80;
+    let startTop = 80;
+    let savedWidth = 360;
+    let savedHeight = 240;
+    let startX = 0;
+    let startY = 0;
+    let mediaRecorder;
+    let recordedChunks = [];
+    let stream;
+
+    titlebar.addEventListener('pointerdown', (event) => {
+      isDragging = true;
+      windowEl.classList.add('dragging');
+      titlebar.setPointerCapture(event.pointerId);
+
+      const rect = windowEl.getBoundingClientRect();
+      offsetX = event.clientX - rect.left;
+      offsetY = event.clientY - rect.top;
+    });
+
+    titlebar.addEventListener('pointermove', (event) => {
+      if (!isDragging) return;
+
+      const maxX = window.innerWidth - windowEl.offsetWidth;
+      const maxY = window.innerHeight - windowEl.offsetHeight;
+
+      let nextX = event.clientX - offsetX;
+      let nextY = event.clientY - offsetY;
+
+      nextX = Math.max(0, Math.min(nextX, maxX));
+      nextY = Math.max(0, Math.min(nextY, maxY));
+
+      windowEl.style.left = `${nextX}px`;
+      windowEl.style.top = `${nextY}px`;
+    });
+
+    titlebar.addEventListener('pointerup', () => {
+      isDragging = false;
+      windowEl.classList.remove('dragging');
+    });
+
+    titlebar.addEventListener('pointerleave', () => {
+      isDragging = false;
+      windowEl.classList.remove('dragging');
+    });
+
+    const setWindowOpen = (open) => {
+      if (open) {
+        windowEl.classList.remove('closed');
+        windowEl.style.width = `${savedWidth}px`;
+        windowEl.style.height = `${savedHeight}px`;
+        windowEl.style.borderRadius = '14px';
+      } else {
+        savedWidth = windowEl.offsetWidth || savedWidth;
+        savedHeight = windowEl.offsetHeight || savedHeight;
+        windowEl.classList.add('closed');
+        windowEl.style.width = '68px';
+        windowEl.style.height = '68px';
+        windowEl.style.borderRadius = '50%';
+      }
+    };
+
+    closeButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setWindowOpen(false);
+    });
+
+    miniToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setWindowOpen(true);
+    });
+
+    resizeHandle.addEventListener('pointerdown', (event) => {
+      isResizing = true;
+      windowEl.classList.add('resizing');
+      resizeHandle.setPointerCapture(event.pointerId);
+      startWidth = windowEl.offsetWidth;
+      startLeft = windowEl.offsetLeft;
+      startX = event.clientX;
+    });
+
+    resizeHandle.addEventListener('pointermove', (event) => {
+      if (!isResizing) return;
+
+      const delta = event.clientX - startX;
+      const minWidth = 220;
+      const nextWidth = Math.max(minWidth, startWidth - delta);
+      const nextLeft = startLeft + (startWidth - nextWidth);
+
+      windowEl.style.width = `${nextWidth}px`;
+      windowEl.style.left = `${nextLeft}px`;
+    });
+
+    resizeHandle.addEventListener('pointerup', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeHandle.addEventListener('pointerleave', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeTopEdge.addEventListener('pointerdown', (event) => {
+      isResizing = true;
+      windowEl.classList.add('resizing');
+      resizeTopEdge.setPointerCapture(event.pointerId);
+      startHeight = windowEl.offsetHeight;
+      startTop = windowEl.offsetTop;
+      startY = event.clientY;
+    });
+
+    resizeTopEdge.addEventListener('pointermove', (event) => {
+      if (!isResizing) return;
+
+      const deltaY = event.clientY - startY;
+      const minHeight = 180;
+      const nextHeight = Math.max(minHeight, startHeight - deltaY);
+      const nextTop = startTop + (startHeight - nextHeight);
+
+      windowEl.style.height = `${nextHeight}px`;
+      windowEl.style.top = `${nextTop}px`;
+    });
+
+    resizeTopEdge.addEventListener('pointerup', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeTopEdge.addEventListener('pointerleave', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeBottomEdge.addEventListener('pointerdown', (event) => {
+      isResizing = true;
+      windowEl.classList.add('resizing');
+      resizeBottomEdge.setPointerCapture(event.pointerId);
+      startHeight = windowEl.offsetHeight;
+      startY = event.clientY;
+    });
+
+    resizeBottomEdge.addEventListener('pointermove', (event) => {
+      if (!isResizing) return;
+
+      const deltaY = event.clientY - startY;
+      const minHeight = 180;
+      const nextHeight = Math.max(minHeight, startHeight + deltaY);
+
+      windowEl.style.height = `${nextHeight}px`;
+    });
+
+    resizeBottomEdge.addEventListener('pointerup', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeBottomEdge.addEventListener('pointerleave', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeCorner.addEventListener('pointerdown', (event) => {
+      isResizing = true;
+      windowEl.classList.add('resizing');
+      resizeCorner.setPointerCapture(event.pointerId);
+      startWidth = windowEl.offsetWidth;
+      startHeight = windowEl.offsetHeight;
+      startX = event.clientX;
+      startY = event.clientY;
+    });
+
+    resizeCorner.addEventListener('pointermove', (event) => {
+      if (!isResizing) return;
+
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+      const minWidth = 220;
+      const minHeight = 180;
+
+      windowEl.style.width = `${Math.max(minWidth, startWidth + deltaX)}px`;
+      windowEl.style.height = `${Math.max(minHeight, startHeight + deltaY)}px`;
+    });
+
+    resizeCorner.addEventListener('pointerup', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeCorner.addEventListener('pointerleave', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeCornerBottomLeft.addEventListener('pointerdown', (event) => {
+      isResizing = true;
+      windowEl.classList.add('resizing');
+      resizeCornerBottomLeft.setPointerCapture(event.pointerId);
+      startWidth = windowEl.offsetWidth;
+      startHeight = windowEl.offsetHeight;
+      startLeft = windowEl.offsetLeft;
+      startX = event.clientX;
+      startY = event.clientY;
+    });
+
+    resizeCornerBottomLeft.addEventListener('pointermove', (event) => {
+      if (!isResizing) return;
+
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+      const minWidth = 220;
+      const minHeight = 180;
+      const nextWidth = Math.max(minWidth, startWidth - deltaX);
+      const nextLeft = startLeft + (startWidth - nextWidth);
+      const nextHeight = Math.max(minHeight, startHeight + deltaY);
+
+      windowEl.style.width = `${nextWidth}px`;
+      windowEl.style.left = `${nextLeft}px`;
+      windowEl.style.height = `${nextHeight}px`;
+    });
+
+    resizeCornerBottomLeft.addEventListener('pointerup', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeCornerBottomLeft.addEventListener('pointerleave', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeCornerTopLeft.addEventListener('pointerdown', (event) => {
+      isResizing = true;
+      windowEl.classList.add('resizing');
+      resizeCornerTopLeft.setPointerCapture(event.pointerId);
+      startWidth = windowEl.offsetWidth;
+      startHeight = windowEl.offsetHeight;
+      startLeft = windowEl.offsetLeft;
+      startTop = windowEl.offsetTop;
+      startX = event.clientX;
+      startY = event.clientY;
+    });
+
+    resizeCornerTopLeft.addEventListener('pointermove', (event) => {
+      if (!isResizing) return;
+
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+      const minWidth = 220;
+      const minHeight = 180;
+      const nextWidth = Math.max(minWidth, startWidth - deltaX);
+      const nextLeft = startLeft + (startWidth - nextWidth);
+      const nextHeight = Math.max(minHeight, startHeight - deltaY);
+      const nextTop = startTop + (startHeight - nextHeight);
+
+      windowEl.style.width = `${nextWidth}px`;
+      windowEl.style.left = `${nextLeft}px`;
+      windowEl.style.height = `${nextHeight}px`;
+      windowEl.style.top = `${nextTop}px`;
+    });
+
+    resizeCornerTopLeft.addEventListener('pointerup', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+    });
+
+    resizeCornerTopLeft.addEventListener('pointerleave', () => {
+      isResizing = false;
+      windowEl.classList.remove('resizing');
+      
+    });
+
+    scanButton.addEventListener('click', async () => {
+      scanOutput.textContent = 'Checking workspace…';
+
+      try {
+        const response = await fetch('/');
+        const html = await response.text();
+        const matches = [...html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)];
+        const items = matches
+          .map((match) => match[2].trim())
+          .filter((name) => name && !name.startsWith('?') && !name.includes('Parent Directory'));
+
+        const uniqueItems = [...new Set(items)].slice(0, 12);
+
+        if (uniqueItems.length === 0) {
+          scanOutput.textContent = 'No workspace items were found in the current directory list.';
+          return;
+        }
+
+        scanOutput.textContent = uniqueItems.join(' • ');
+      } catch (error) {
+        scanOutput.textContent = 'Workspace scan failed. The preview server may not be exposing the directory listing.';
+      }
+    });
+
+    recordButton.addEventListener('click', async () => {
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true
+          });
+
+          recordedChunks = [];
+          mediaRecorder = new MediaRecorder(stream);
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              recordedChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'recording.webm';
+            link.click();
+            URL.revokeObjectURL(url);
+            recordButton.textContent = 'Start';
+            recordButton.classList.remove('recording');
+
+            stream.getTracks().forEach((track) => track.stop());
+          };
+
+          mediaRecorder.start();
+          recordButton.textContent = 'Stop';
+          recordButton.classList.add('recording');
+        } catch (error) {
+          alert('Screen recording permission was blocked or unavailable.');
+        }
+      } else {
+        mediaRecorder.stop();
+      }
+    });
+  </script>
+</body>
+</html>
