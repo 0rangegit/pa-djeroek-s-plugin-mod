@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>useless ui</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.7);
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #fb923c;
+      --accent-2: #38bdf8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      font-family: 'Source Code Pro', monospace;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.2), transparent 28%),
+        linear-gradient(135deg, var(--bg), #111827);
+    }
+
+    .stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .widget {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(14px);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+      user-select: none;
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .widget:hover {
+      transform: translate(-50%, -50%) scale(1.04);
+    }
+
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(2, 6, 23, 0.7);
+      color: var(--muted);
+      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="hint">click the nonsense buttons and they will scamper away</div>
+  </div>
+
+  <script>
+    const stage = document.getElementById('stage');
+    const phrases = ['bloop', 'wiggle', 'sprocket', 'murmur', 'nope', 'glow', 'snorf'];
+
+    const createWidget = (x = null, y = null) => {
+      const widget = document.createElement('button');
+      widget.className = 'widget';
+      widget.type = 'button';
+      widget.textContent = `${phrases[Math.floor(Math.random() * phrases.length)]} ${Math.floor(Math.random() * 99) + 1}`;
+      widget.style.left = `${x ?? Math.random() * window.innerWidth}px`;
+      widget.style.top = `${y ?? Math.random() * window.innerHeight}px`;
+
+      widget.addEventListener('click', (event) => {
+        event.stopPropagation();
+        widget.style.left = `${Math.random() * window.innerWidth}px`;
+        widget.style.top = `${Math.random() * window.innerHeight}px`;
+        widget.textContent = `${phrases[Math.floor(Math.random() * phrases.length)]} ${Math.floor(Math.random() * 99) + 1}`;
+      });
+
+      stage.appendChild(widget);
+      return widget;
+    };
+
+    createWidget(140, 140);
+    createWidget(260, 220);
+    createWidget(420, 180);
+    createWidget(180, 360);
+  </script>
+</body>
+</html>
