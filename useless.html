@@ -79,6 +79,27 @@
   <script>
     const stage = document.getElementById('stage');
     const phrases = ['bloop', 'wiggle', 'sprocket', 'murmur', 'nope', 'glow', 'snorf'];
+    const audioCtx = window.AudioContext ? new AudioContext() : null;
+
+    const playButtonSound = (frequency = 540) => {
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.type = 'square';
+      oscillator.frequency.value = frequency;
+      gainNode.gain.value = 0.0001;
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+
+      gainNode.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.18);
+      oscillator.stop(audioCtx.currentTime + 0.2);
+    };
 
     const createWidget = (x = null, y = null) => {
       const widget = document.createElement('button');
@@ -90,6 +111,7 @@
 
       widget.addEventListener('click', (event) => {
         event.stopPropagation();
+        playButtonSound(420 + Math.floor(Math.random() * 220));
         widget.style.left = `${Math.random() * window.innerWidth}px`;
         widget.style.top = `${Math.random() * window.innerHeight}px`;
         widget.textContent = `${phrases[Math.floor(Math.random() * phrases.length)]} ${Math.floor(Math.random() * 99) + 1}`;

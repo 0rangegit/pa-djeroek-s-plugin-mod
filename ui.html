@@ -519,6 +519,35 @@
     const closeButton = document.getElementById('closeButton');
     const miniToggle = document.getElementById('miniToggle');
 
+    const audioCtx = window.AudioContext ? new AudioContext() : null;
+
+    const playButtonSound = (type = 'tap') => {
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.type = type === 'heavy' ? 'square' : 'triangle';
+      oscillator.frequency.value = type === 'heavy' ? 620 : 440;
+      gainNode.gain.value = 0.0001;
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.start();
+
+      gainNode.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.18);
+      oscillator.stop(audioCtx.currentTime + 0.2);
+    };
+
+    const attachSound = (element, type = 'tap') => {
+      element.addEventListener('click', (event) => {
+        event.stopPropagation();
+        playButtonSound(type);
+      });
+    };
+
     let isDragging = false;
     let isResizing = false;
     let offsetX = 0;
@@ -632,6 +661,7 @@
 
     closeButton.addEventListener('click', (event) => {
       event.stopPropagation();
+      playButtonSound('heavy');
       setWindowOpen(false);
     });
 
@@ -647,6 +677,7 @@
         miniPointerActive = false;
         return;
       }
+      playButtonSound('tap');
       setWindowOpen(true);
     });
 
@@ -928,17 +959,20 @@
     };
 
     explorerBack.addEventListener('click', async () => {
+      playButtonSound('tap');
       const nextPath = getParentPath(explorerPath.textContent || '/');
       await renderExplorer(nextPath);
     });
 
     explorerToggleBtn.addEventListener('click', () => {
+      playButtonSound('tap');
       explorerCollapsed = !explorerCollapsed;
       explorerCard.classList.toggle('collapsed', explorerCollapsed);
       explorerToggleBtn.textContent = explorerCollapsed ? 'expand' : 'collapse';
     });
 
     explorerResetBtn.addEventListener('click', async () => {
+      playButtonSound('tap');
       explorerCollapsed = false;
       explorerCard.classList.remove('collapsed');
       explorerToggleBtn.textContent = 'collapse';
@@ -946,16 +980,19 @@
     });
 
     explorerFocusBtn.addEventListener('click', () => {
+      playButtonSound('heavy');
       windowEl.style.left = '20px';
       windowEl.style.top = '20px';
       setWindowOpen(true);
     });
 
     openUselessButton.addEventListener('click', () => {
+      playButtonSound('heavy');
       window.open('useless.html', '_blank', 'noopener,noreferrer');
     });
 
     scanButton.addEventListener('click', async () => {
+      playButtonSound('tap');
       scanOutput.textContent = 'Checking workspace…';
 
       try {
@@ -979,6 +1016,7 @@
     renderExplorer('/');
 
     recordButton.addEventListener('click', async () => {
+      playButtonSound('tap');
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
         try {
           stream = await navigator.mediaDevices.getDisplayMedia({
